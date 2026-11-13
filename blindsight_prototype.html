@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BLINDSIGHT — Prototype 0.1</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#111514; font-family:Arial,Helvetica,sans-serif; color:#e4e5dc; }
+  #game { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; touch-action:none; }
+  #vignette { position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,.55) 100%); }
+  #topbar { position:fixed; top:12px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:flex-start; pointer-events:none; gap:10px; }
+  .panel { background:rgba(13,18,17,.72); border:1px solid rgba(205,214,201,.16); padding:9px 12px; backdrop-filter:blur(8px); }
+  #brand { letter-spacing:.24em; font-size:13px; font-weight:700; }
+  #subbrand { font-size:9px; color:#a2aaa0; letter-spacing:.16em; margin-top:4px; }
+  #score { display:flex; gap:16px; align-items:center; font-size:11px; letter-spacing:.08em; }
+  .dots { display:flex; gap:4px; margin-top:6px; }
+  .dot { width:10px; height:4px; background:#59615a; }
+  .dot.on { background:#d8d5bd; box-shadow:0 0 8px rgba(220,220,190,.4); }
+  #status { position:fixed; top:82px; left:50%; transform:translateX(-50%); text-align:center; min-width:210px; pointer-events:none; }
+  #phase { font-size:11px; letter-spacing:.2em; color:#d5d6c9; }
+  #timer { font-size:32px; font-weight:200; letter-spacing:.08em; margin-top:2px; text-shadow:0 2px 15px #000; }
+  #hint { font-size:10px; letter-spacing:.08em; color:#a9b0a6; margin-top:4px; }
+  #bottom { position:fixed; bottom:14px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:flex-end; pointer-events:none; }
+  #help { font-size:10px; line-height:1.6; color:#aeb5aa; background:rgba(10,14,13,.55); padding:8px 10px; max-width:290px; }
+  #controls { display:flex; gap:8px; align-items:flex-end; pointer-events:auto; }
+  button { color:#e5e6dc; background:rgba(18,25,23,.88); border:1px solid rgba(220,225,210,.28); padding:12px 14px; min-width:66px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; border-radius:2px; }
+  button:active { background:#667168; }
+  #fire { border-color:#b9a99b; background:rgba(71,49,42,.88); min-width:76px; }
+  #zoom { min-width:58px; }
+  #joystick { position:fixed; left:20px; bottom:28px; width:116px; height:116px; border:1px solid rgba(220,225,210,.22); border-radius:50%; background:rgba(15,20,18,.25); display:none; touch-action:none; }
+  #stick { position:absolute; left:37px; top:37px; width:40px; height:40px; border-radius:50%; background:rgba(200,207,190,.35); border:1px solid rgba(230,230,210,.35); }
+  #scopeOverlay { position:fixed; inset:0; display:none; pointer-events:none; background:radial-gradient(circle at center, transparent 0 29%, rgba(0,0,0,.9) 30% 100%); }
+  #scopeOverlay:before { content:""; position:absolute; left:50%; top:50%; width:1px; height:48%; background:rgba(220,224,207,.7); transform:translate(-50%,-50%); }
+  #scopeOverlay:after { content:""; position:absolute; top:50%; left:50%; width:48%; height:1px; background:rgba(220,224,207,.7); transform:translate(-50%,-50%); }
+  #scopeLabel { position:absolute; top:18%; left:50%; transform:translateX(-50%); font-size:9px; letter-spacing:.22em; color:#d6d8cb; text-shadow:0 1px 5px #000; }
+  #toast { position:fixed; left:50%; top:43%; transform:translate(-50%,-50%); background:rgba(12,17,15,.9); border:1px solid rgba(220,225,210,.3); padding:18px 24px; text-align:center; letter-spacing:.15em; font-size:13px; display:none; }
+  #start { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(rgba(7,12,11,.35),rgba(7,12,11,.82)); }
+  #startCard { width:min(420px,calc(100% - 36px)); background:rgba(12,17,16,.88); border:1px solid rgba(220,225,210,.22); padding:28px; text-align:center; }
+  #startCard h1 { margin:0; font-size:30px; letter-spacing:.3em; font-weight:500; }
+  #startCard .tag { color:#aab1a6; font-size:10px; letter-spacing:.2em; margin:10px 0 22px; }
+  #startCard p { color:#b5bcb1; font-size:12px; line-height:1.6; margin:0 0 20px; }
+  #startCard button { width:100%; padding:15px; }
+  #startCard .small { margin-top:12px; font-size:9px; color:#7f8980; letter-spacing:.08em; }
+  #toast button { margin-top:12px; }
+  @media (pointer:coarse) {
+    #joystick { display:block; }
+    #help { display:none; }
+    #bottom { bottom:12px; }
+    #controls { margin-left:auto; }
+    button { min-width:58px; padding:13px 10px; }
+  }
+</style>
+</head>
+<body>
+<div id="game"></div><div id="vignette"></div>
+<div id="topbar">
+  <div class="panel"><div id="brand">BLINDSIGHT</div><div id="subbrand">PROTOTYPE 0.1 / THE BLOCK</div></div>
+  <div class="panel" id="score">
+    <div><div>YOU</div><div class="dots" id="youDots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div>
+    <div style="color:#788078">VS</div>
+    <div><div>BOT</div><div class="dots" id="botDots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div>
+  </div>
+</div>
+<div id="status"><div id="phase">PREPARING</div><div id="timer">10</div><div id="hint">FIND YOUR POSITION</div></div>
+<div id="bottom">
+  <div id="help">WASD / ARROWS — MOVE<br>DRAG — LOOK AROUND<br>RIGHT CLICK / AIM — SCOPE · SPACE — FIRE</div>
+  <div id="controls">
+    <button id="crouch">CROUCH</button><button id="aim">SCOPE</button><button id="zoom">2×</button><button id="fire">FIRE</button>
+  </div>
+</div>
+<div id="joystick"><div id="stick"></div></div>
+<div id="scopeOverlay"><div id="scopeLabel">BLINDSIGHT OPTIC · 2× / HOLD BREATH</div></div>
+<div id="toast"></div>
+<div id="start"><div id="startCard"><h1>BLINDSIGHT</h1><div class="tag">TWO WINDOWS. ONE SHOT.</div><p>A first playable 3D gameplay study.<br>Move through the apartment, find cover, and locate the silhouette across the street.</p><button id="startBtn">ENTER THE BLOCK</button><div class="small">BEST EXPERIENCED IN LANDSCAPE · DESKTOP OR TOUCH</div></div></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+
+const mount=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x78817d);
+scene.fog=new THREE.FogExp2(0x78817d,0.025);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,180);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7)); renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15;
+mount.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xb9c5c0,0x343b37,1.65));
+const sun=new THREE.DirectionalLight(0xd5d3c5,2.0); sun.position.set(-8,16,9); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024); scene.add(sun);
+const fill=new THREE.DirectionalLight(0x91a6a7,.55); fill.position.set(8,7,-12); scene.add(fill);
+
+const mat=(c,r=.9,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const concrete=mat(0x555d59), concrete2=mat(0x737872), dark=mat(0x252c29), floorMat=mat(0x484e49), wood=mat(0x51483b), rust=mat(0x59463a), glass=new THREE.MeshStandardMaterial({color:0x879b9a,roughness:.3,metalness:.25,transparent:true,opacity:.22}), cloth=mat(0x424b45), skin=mat(0x887c6c), botCloth=mat(0x292f2d);
+function box(parent,x,y,z,w,h,d,material,cast=true){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);o.position.set(x,y,z);o.castShadow=cast;o.receiveShadow=true;parent.add(o);return o;}
+function group(parent,x=0,y=0,z=0){const g=new THREE.Group();g.position.set(x,y,z);parent.add(g);return g;}
+
+// Ground and street
+box(scene,0,-.42,0,100,.8,100,mat(0x303936));
+box(scene,0,-.005,0,100,.03,100,mat(0x414946),false);
+for(let i=0;i<12;i++){box(scene,(i-5.5)*2,.02,0,.08,.015,16,mat(0x626a63),false);}
+for(let i=0;i<35;i++){let x=(Math.random()-.5)*25,z=(Math.random()-.5)*25;box(scene,x,.04,z,.15+Math.random()*.4,.06,.12+Math.random()*.3,rust,false);}
+
+// Opposing buildings
+function makeApartment(z, facing, isPlayer){
+ const g=group(scene,0,0,z);
+ const base=floorMat;
+ box(g,0,0,0,10,.35,8,base);
+ // back and side walls, leaving open front to see interior
+ box(g,0,2.2,-3.9,10,4.4,.35,concrete);
+ box(g,-4.85,2.2,0,.3,4.4,8,concrete2);
+ box(g,4.85,2.2,0,.3,4.4,8,concrete2);
+ box(g,0,4.4,0,10,.28,8,concrete);
+ // interior partitions with gaps
+ box(g,-1.6,1.45,-1.15,.22,2.9,5.1,concrete2);
+ box(g,1.65,1.45,-2.1, .22,2.9,3.5,concrete);
+ box(g,.1,1.45,1.55,3.5,2.9,.18,concrete2);
+ // window frame on front
+ for(let x of [-3.3,0,3.3]){
+   box(g,x,2.45,4.03,2.35,2.35,.16,dark);
+   box(g,x,2.45,4.13,2.12,2.12,.05,glass,false);
+   box(g,x,2.45,4.17,.045,2.18,.06,concrete2,false);
+   box(g,x,2.45,4.17,2.18,.045,.06,concrete2,false);
+ }
+ // balcony on right
+ box(g,3.15,.95,4.65,3.2,.16,1.35,concrete2);
+ for(let x of [1.65,2.45,3.25,4.05,4.65]) box(g,x,1.55,5.28,.07,1.1,.07,dark);
+ box(g,3.15,2.08,5.28,3.1,.08,.08,dark);
+ // damaged wall chunks
+ box(g,-4.7,3.8,2.8,.45,.8,1.3,rust);
+ box(g,4.5,3.6,-3.1,.5,1.1,1.4,concrete2);
+ // furniture / cover
+ const props=isPlayer?[
+  [-3.1,.55,-2.7,1.5,1.1,.8,wood],[-.3,.42,2.5,1.1,.8,.9,rust],[2.9,.65,-1.5,1.2,1.3,.8,cloth],
+  [-2.7,.35,.2,.8,.7,.7,concrete2],[1.0,.4,-3.1,1.4,.8,.6,wood],[3.8,.45,2.2,.7,.9,.7,wood]
+ ]:[
+  [-3,.55,-2.7,1.4,1.1,.8,wood],[.1,.4,2.4,1.2,.8,.9,rust],[2.9,.65,-1.5,1.1,1.3,.8,cloth],
+  [-2.6,.35,.2,.8,.7,.7,concrete2],[1,.4,-3.1,1.4,.8,.6,wood],[3.8,.45,2.2,.7,.9,.7,wood]
+ ];
+ props.forEach(p=>box(g,...p));
+ // hanging curtain
+ const curtain=box(g,-1.8,2.45,3.82,.65,2.15,.08,cloth); curtain.rotation.z=.06;
+ // scattered rubble
+ for(let i=0;i<14;i++){let o=box(g,(Math.random()-.5)*8,.12+Math.random()*.12,(Math.random()-.5)*6,.18+Math.random()*.35,.18,.2+Math.random()*.3,rust);o.rotation.y=Math.random()*2;}
+ // ceiling broken slabs
+ box(g,-3.5,4.25,-1,.25,.2,2.2,concrete2);
+ return g;
+}
+makeApartment(-12,1,true); makeApartment(12,-1,false);
+// city blocks beyond
+for(let i=0;i<9;i++){
+ let x=(i-4)*5.5;
+ let h=10+Math.random()*12;
+ box(scene,x,h/2,-27,4,h,5,mat(0x515a56),false);
+ box(scene,x+1.2,h*.65,-24.4,1,.05,.05,dark,false);
+ box(scene,x,h/2,27,4,h,5,mat(0x515a56),false);
+}
+// Rain particles
+const rainN=900, rainGeo=new THREE.BufferGeometry(), rainPos=new Float32Array(rainN*3);
+for(let i=0;i<rainN;i++){rainPos[i*3]=(Math.random()-.5)*55;rainPos[i*3+1]=Math.random()*25;rainPos[i*3+2]=(Math.random()-.5)*55;}
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));
+const rain=new THREE.Points(rainGeo,new THREE.PointsMaterial({color:0xc2cbc5,size:.045,transparent:true,opacity:.45}));
+scene.add(rain);
+
+// Player and bot character models
+function character(parent, clothes, x,z){
+ const c=group(parent,x,0,z);
+ const body=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.75,4,8),clothes); body.position.y=1.05; body.castShadow=true;c.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),skin); head.position.y=1.72; head.castShadow=true;c.add(head);
+ const hood=new THREE.Mesh(new THREE.SphereGeometry(.245,10,8,0,Math.PI*2,0,Math.PI*.58),clothes);hood.position.y=1.77;c.add(hood);
+ const leg1=box(c,-.14,.38,0,.16,.65,.18,dark), leg2=box(c,.14,.38,0,.16,.65,.18,dark);
+ return {group:c,body,head,leg1,leg2};
+}
+const player=character(scene,cloth,0,-9.5);
+const bot=character(scene,botCloth,0,9.5);
+bot.group.rotation.y=Math.PI;
+let playerYaw=0, playerPitch=0, moveX=0,moveZ=0, crouched=false, aiming=false, zoom=1;
+let phase='intro', timeLeft=10, you=0, botScore=0, turnCount=0, gameStarted=false, lastShot=0;
+const youDots=document.querySelectorAll('#youDots .dot'),botDots=document.querySelectorAll('#botDots .dot');
+function scoreUI(){youDots.forEach((d,i)=>d.classList.toggle('on',i<you));botDots.forEach((d,i)=>d.classList.toggle('on',i<botScore));}
+function uiPhase(name,hint){document.getElementById('phase').textContent=name;document.getElementById('hint').textContent=hint;}
+function toast(msg,button){const el=document.getElementById('toast');el.innerHTML=msg+(button?'<br><button id="toastBtn">CONTINUE</button>':'');el.style.display='block';if(button)document.getElementById('toastBtn').onclick=()=>{el.style.display='none';};}
+const scope=document.getElementById('scopeOverlay');
+function setAim(v){aiming=v;scope.style.display=v?'block':'none';document.getElementById('aim').textContent=v?'EXIT SCOPE':'SCOPE';}
+document.getElementById('aim').onclick=()=>{if(phase==='youhunt')setAim(!aiming);};
+document.getElementById('zoom').onclick=()=>{zoom=zoom===1?2:1;document.getElementById('zoom').textContent=zoom===1?'2×':'1×';};
+document.getElementById('crouch').onclick=()=>{crouched=!crouched;document.getElementById('crouch').textContent=crouched?'STAND':'CROUCH';};
+function startHiding(){phase='hide';timeLeft=10;setAim(false);uiPhase('HIDE / REPOSITION','FIND COVER · 10 SECONDS');}
+function startYouHunt(){phase='youhunt';timeLeft=20;setAim(false);uiPhase('YOUR TURN TO HUNT','FIND THE SILHOUETTE · 20 SECONDS');}
+function startBotHunt(){phase='bothunt';timeLeft=20;setAim(false);uiPhase('BOT IS HUNTING','MOVE · STAY OUT OF SIGHT · 20 SECONDS');}
+function resetPositions(){player.group.position.set(0,0,-9.5);bot.group.position.set((Math.random()-.5)*5,0,9.5);playerYaw=0;playerPitch=0;}
+function begin(){document.getElementById('start').style.display='none';gameStarted=true;startHiding();}
+document.getElementById('startBtn').onclick=begin;
+
+// Shooting: raycast against bot body/head. scope aim points toward opposite apartment.
+const raycaster=new THREE.Raycaster();
+function shoot(){
+ if(phase!=='youhunt'||!aiming||performance.now()-lastShot<650)return;
+ lastShot=performance.now();
+ raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+ const hits=raycaster.intersectObjects([bot.body,bot.head],false);
+ if(hits.length){you++;scoreUI();setAim(false);phase='hit';uiPhase('CONFIRMED','');toast('TARGET DOWN<br><span style="font-size:10px;color:#9da69b">REVERSE SIGNAL · RESPAWN</span>',false);setTimeout(()=>{document.getElementById('toast').style.display='none';if(you>=3)endGame(true);else{resetPositions();startHiding();}},1250);}
+ else {toast('SHOT MISSED',false);setTimeout(()=>document.getElementById('toast').style.display='none',700);}
+}
+document.getElementById('fire').onclick=shoot;
+function endGame(win){phase='end';uiPhase('MATCH COMPLETE',win?'YOU WIN':'BOT WINS');toast((win?'YOU WIN':'BOT WINS')+'<br><span style="font-size:10px;color:#9da69b">BLINDSIGHT · THE BLOCK</span><br><button id="again">PLAY AGAIN</button>',false);setTimeout(()=>{let b=document.getElementById('again');if(b)b.onclick=()=>{you=0;botScore=0;scoreUI();document.getElementById('toast').style.display='none';resetPositions();startHiding();};},0);}
+
+// Keyboard and pointer controls
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key===' '){e.preventDefault();shoot();}if(e.key.toLowerCase()==='q'&&phase==='youhunt')setAim(!aiming);});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+let dragging=false,lastX=0,lastY=0;
+renderer.domElement.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);});
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;let dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;playerYaw-=dx*.004;playerPitch=Math.max(-.35,Math.min(.35,playerPitch-dy*.003));});
+renderer.domElement.addEventListener('pointerup',()=>dragging=false);
+renderer.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(phase==='youhunt')setAim(!aiming);});
+
+// Touch joystick
+const joy=document.getElementById('joystick'),stick=document.getElementById('stick');let joyId=null;
+joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joy.setPointerCapture(joyId);joyMove(e);});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e);});
+function joyMove(e){const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy,len=Math.hypot(dx,dy),max=38;if(len>max){dx=dx/len*max;dy=dy/len*max;}moveX=dx/max;moveZ=dy/max;stick.style.transform=`translate(${dx}px,${dy}px)`;}
+function joyEnd(){joyId=null;moveX=0;moveZ=0;stick.style.transform='translate(0,0)';}
+joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+
+// Bot behavior and movement
+let botMoveTarget=new THREE.Vector3(2.5,0,9.5), botMoveTimer=0, botVisible=0;
+function chooseBotSpot(){botMoveTarget.set((Math.random()-.5)*7,0,8.0+Math.random()*2.5);botMoveTimer=2+Math.random()*3;}
+function updateBot(dt){
+ botMoveTimer-=dt;if(botMoveTimer<=0)chooseBotSpot();
+ if(phase==='hide'||phase==='bothunt'||phase==='youhunt'){
+  const dir=botMoveTarget.clone().sub(bot.group.position);dir.y=0;
+  if(dir.length()>.15){dir.normalize();bot.group.position.addScaledVector(dir,dt*.8);bot.group.rotation.y=Math.atan2(dir.x,dir.z);}
+ }
+}
+function botAttack(){
+ if(phase!=='bothunt')return;
+ // Basic prototype AI: movement, concealment heuristic and probabilistic shot.
+ const dist=Math.hypot(player.group.position.x,player.group.position.z+9.5);
+ const exposed=Math.abs(player.group.position.x)>2.6||Math.abs(player.group.position.z+9.5)<1.2;
+ const chance=exposed?.42:.16;
+ if(Math.random()<chance){botScore++;scoreUI();phase='hit';toast('YOU WERE HIT<br><span style="font-size:10px;color:#9da69b">REVERSE SIGNAL · RESPAWN</span>',false);setTimeout(()=>{document.getElementById('toast').style.display='none';if(botScore>=3)endGame(false);else{resetPositions();startHiding();}},1250);}
+ else {startYouHunt();}
+}
+
+// Camera follow, scope
+const camTarget=new THREE.Vector3();
+function updateCamera(dt){
+ const p=player.group.position;
+ if(aiming&&phase==='youhunt'){
+  const dir=new THREE.Vector3(Math.sin(playerYaw),playerPitch,Math.cos(playerYaw));
+  camera.position.set(p.x,p.y+1.55,p.z);
+  const target=new THREE.Vector3(p.x+dir.x*30,p.y+1.55+dir.y*30,12);
+  camera.lookAt(target);
+  camera.fov=zoom===1?34:19;
+ }else{
+  const back=new THREE.Vector3(Math.sin(playerYaw)*-5,2.8,Math.cos(playerYaw)*-5);
+  const desired=new THREE.Vector3(p.x+back.x,p.y+back.y,p.z+back.z);
+  camera.position.lerp(desired,Math.min(1,dt*5));
+  camTarget.set(p.x,p.y+1.25,p.z);
+  camera.lookAt(camTarget);
+  camera.fov=65;
+ }
+ camera.updateProjectionMatrix();
+}
+function updatePlayer(dt){
+ let mx=moveX+(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+ let mz=moveZ+(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+ const len=Math.hypot(mx,mz);if(len>1){mx/=len;mz/=len;}
+ const forward=new THREE.Vector3(Math.sin(playerYaw),0,Math.cos(playerYaw));
+ const right=new THREE.Vector3(forward.z,0,-forward.x);
+ const move=right.multiplyScalar(mx).add(forward.multiplyScalar(-mz));
+ if(move.lengthSq()>0){move.normalize();player.group.position.addScaledVector(move,dt*(crouched?1.25:2.25));player.group.rotation.y=Math.atan2(move.x,move.z);}
+ player.group.position.x=THREE.MathUtils.clamp(player.group.position.x,-4.25,4.25);
+ player.group.position.z=THREE.MathUtils.clamp(player.group.position.z,-15.2,-7.1);
+ player.body.scale.y=crouched?.72:1;player.body.position.y=crouched?.85:1.05;player.head.position.y=crouched?1.35:1.72;player.leg1.position.y=crouched?.28:.38;player.leg2.position.y=crouched?.28:.38;
+}
+
+// Weather / ambient animation
+let last=performance.now();
+function animate(now){
+ requestAnimationFrame(animate);const dt=Math.min(.04,(now-last)/1000);last=now;
+ updatePlayer(dt);updateBot(dt);updateCamera(dt);
+ const pos=rain.geometry.attributes.position;
+ for(let i=0;i<rainN;i++){pos.array[i*3+1]-=dt*10;if(pos.array[i*3+1]<0){pos.array[i*3+1]=22;pos.array[i*3]=(Math.random()-.5)*55;}}
+ pos.needsUpdate=true;
+ if(gameStarted&&phase!=='end'&&phase!=='hit'&&phase!=='intro'){
+  timeLeft-=dt;
+  if(timeLeft<=0){
+   if(phase==='hide')startYouHunt();
+   else if(phase==='youhunt')startBotHunt();
+   else if(phase==='bothunt')botAttack();
+  }
+  document.getElementById('timer').textContent=Math.max(0,Math.ceil(timeLeft)).toString().padStart(2,'0');
+ }
+ // Scope label / slight camera breathing
+ renderer.render(scene,camera);
+}
+requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
